@@ -9,6 +9,7 @@ An AI-assisted networking automation tool that automatically generates L2/L3 net
 - **OSPF Configuration Generation**: Automatically create OSPF routing configurations for all devices
 - **Configuration Rendering**: Use Jinja2 templates for multi-vendor device configurations (Cisco, Linux, etc.)
 - **Topology Export**: Export in Containerlab-compatible YAML format
+- **Pipeline Orchestration**: Single endpoint to execute complete workflow (topology, config, export, analysis)
 - **REST API**: Full-featured REST API for programmatic access
 
 ### 🤖 AI-Assisted Analysis & Optimization
@@ -77,7 +78,81 @@ Once started, visit:
 - **Interactive API docs (Swagger UI)**: http://localhost:8000/docs
 - **Alternative API docs (ReDoc)**: http://localhost:8000/redoc
 
-## 📁 Project Structure
+### 🚀 Quick Demo - Pipeline Orchestration
+
+Run the complete networking automation workflow in a single API call:
+
+**Using Swagger UI** (Recommended for Interviews):
+1. Visit: http://localhost:8000/docs
+2. Find: **POST /api/v1/run-pipeline**
+3. Click: **"Try it out"**
+4. Execute with default parameters or customize
+
+**Using cURL**:
+```bash
+curl -X POST "http://localhost:8000/api/v1/run-pipeline" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topology_name": "demo-topology",
+    "num_routers": 4,
+    "num_switches": 2,
+    "run_analysis": true
+  }'
+```
+
+**Using PowerShell**:
+```powershell
+$payload = @{
+    topology_name = "demo-topology"
+    num_routers = 4
+    num_switches = 2
+    run_analysis = $true
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/run-pipeline" `
+    -Method POST `
+    -Headers @{'Content-Type'='application/json'} `
+    -Body $payload
+```
+
+**For more demo options and documentation**:
+- See [RUN_DEMO.md](RUN_DEMO.md) for quick-start guide
+- See [DEMO.md](DEMO.md) for interview preparation guide
+- See [PIPELINE_ORCHESTRATION.md](PIPELINE_ORCHESTRATION.md) for complete API reference
+
+## � Documentation
+
+### Core Documentation
+- **[README.md](README.md)** - This file. Overview and getting started
+- **[QUICK_START_AI.md](QUICK_START_AI.md)** - AI and learning features quick start
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design patterns
+- **[IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md)** - Feature implementation status
+
+### Pipeline Orchestration
+- **[PIPELINE_ORCHESTRATION.md](PIPELINE_ORCHESTRATION.md)** - Complete /run-pipeline API reference
+  - Request/response schemas
+  - All pipeline stages explained
+  - Error handling and debugging
+  - Integration patterns
+  
+- **[RUN_DEMO.md](RUN_DEMO.md)** - Quick demo guide
+  - Step-by-step instructions
+  - Multiple demo scenarios
+  - Troubleshooting
+  
+- **[DEMO.md](DEMO.md)** - Interview preparation guide
+  - Full workflow explanation
+  - Common questions and answers
+  - Code walkthrough guidance
+  - Key talking points
+
+### Additional Resources
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup instructions
+- **[COMPLETE_USER_GUIDE.md](COMPLETE_USER_GUIDE.md)** - Comprehensive user manual
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project overview and status
+- **[START_HERE.md](START_HERE.md)** - First-time user guide
+
+## �📁 Project Structure
 
 ```
 networking-automation-engine/
@@ -88,7 +163,8 @@ networking-automation-engine/
 │   │
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── routes.py           # API endpoints
+│   │   ├── routes.py           # API endpoints
+│   │   └── pipeline.py         # Pipeline orchestration (NEW)
 │   │
 │   ├── core/
 │   │   ├── __init__.py
@@ -138,7 +214,37 @@ GET /api/v1/info
 ```
 Check service status and capabilities.
 
-### 2. Topology Generation
+### 2. Pipeline Orchestration (NEW)
+```
+POST /api/v1/run-pipeline
+```
+Execute the complete networking automation workflow in a single request. This endpoint orchestrates all stages of topology generation, configuration creation, Containerlab export, and analysis.
+
+**Request Body**:
+```json
+{
+    "topology_name": "production-topology",
+    "num_routers": 5,
+    "num_switches": 3,
+    "seed": 42,
+    "container_image": "frrouting/frr:latest",
+    "run_analysis": true
+}
+```
+
+**Workflow Stages**:
+1. **Topology Generation** - Creates valid network topology
+2. **Configuration Generation** - Generates OSPF configs with Jinja2
+3. **Containerlab Export** - Exports deployment-ready YAML
+4. **Topology Analysis** - Analyzes health, detects issues
+
+**Response**: Comprehensive results with stage timing, topology summary, and analysis findings.
+
+**Demonstration**: See [RUN_DEMO.md](RUN_DEMO.md) for quick-start examples.
+
+**Documentation**: See [PIPELINE_ORCHESTRATION.md](PIPELINE_ORCHESTRATION.md) for complete API reference.
+
+### 3. Topology Generation
 ```
 POST /api/v1/topology/generate
 ```
@@ -154,7 +260,7 @@ Generate a new network topology.
 }
 ```
 
-### 3. Configuration Generation
+### 4. Configuration Generation
 ```
 POST /api/v1/configuration/generate
 ```
@@ -162,7 +268,7 @@ Generate OSPF configurations for topology.
 
 **Request Body**: Topology object (from generate endpoint)
 
-### 4. Export to Containerlab
+### 5. Export to Containerlab
 ```
 POST /api/v1/topology/export/containerlab
 ```
@@ -171,13 +277,13 @@ Export topology in Containerlab format.
 **Query Parameters**:
 - `image`: Container image (default: `frrouting/frr:latest`)
 
-### 5. Export to YAML
+### 6. Export to YAML
 ```
 POST /api/v1/topology/export/yaml
 ```
 Export topology in universal YAML format.
 
-### 6. Topology Statistics
+### 7. Topology Statistics
 ```
 GET /api/v1/stats/topology
 ```
