@@ -10,6 +10,7 @@ from app.generator import TopologyGenerator
 from app.core import ConfigurationGenerator
 from app.deployment import DeploymentExporter
 from app.database import get_db
+from app.api.pipeline import PipelineOrchestrator, PipelineRequest, PipelineResponse
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,77 @@ router = APIRouter(prefix="/api/v1", tags=["topology"])
 topology_generator = TopologyGenerator()
 config_generator = ConfigurationGenerator()
 deployment_exporter = DeploymentExporter()
+pipeline_orchestrator = PipelineOrchestrator()
+
+
+# ============================================================================
+# Pipeline Orchestration Endpoints
+# ============================================================================
+
+@router.post(
+    "/run-pipeline",
+    response_model=PipelineResponse,
+    summary="Execute Complete Networking Automation Pipeline",
+    description="Automatically execute the full workflow: topology generation, configuration generation, "
+                "Containerlab export, and topology analysis",
+    tags=["pipeline"]
+)
+async def run_pipeline(request: PipelineRequest) -> PipelineResponse:
+    """
+    Execute the complete networking automation pipeline.
+    
+    This endpoint orchestrates the entire workflow:
+    1. Generate Network Topology - Creates a random but valid network topology
+    2. Generate Configurations - Creates OSPF routing configs using Jinja2 templates
+    3. Export Containerlab YAML - Exports topology in Containerlab format for deployment
+    4. Run Analysis - Performs comprehensive topology analysis
+    
+    Args:
+        request: PipelineRequest with topology generation and deployment parameters
+            - topology_name: Name for the generated topology
+            - num_routers: Number of routers (2-20)
+            - num_switches: Number of switches (0-10)
+            - seed: Optional seed for reproducible generation
+            - container_image: Container image for Containerlab nodes
+            - run_analysis: Whether to perform topology analysis
+    
+    Returns:
+        PipelineResponse containing:
+        - pipeline_id: Unique execution identifier
+        - execution_timestamp: When the pipeline started
+        - total_duration_seconds: Total execution time
+        - overall_status: success, partial_success, or failed
+        - stages: Results from each pipeline stage
+        - summary: High-level summary of generated topology and analysis results
+    
+    Raises:
+        HTTPException: If pipeline execution fails
+    
+    Example:
+        POST /api/v1/run-pipeline
+        {
+            "topology_name": "production-topology",
+            "num_routers": 5,
+            "num_switches": 3,
+            "run_analysis": true
+        }
+    """
+    try:
+        logger.info(f"Starting pipeline execution for topology '{request.topology_name}'")
+        
+        # Execute the pipeline
+        pipeline_result = pipeline_orchestrator.run(request)
+        
+        logger.info(
+            f"Pipeline execution completed with status '{pipeline_result.overall_status}' "
+            f"in {pipeline_result.total_duration_seconds:.2f} seconds"
+        )
+        
+        return pipeline_result
+        
+    except Exception as e:
+        logger.error(f"Pipeline execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
 
 
 @router.post(
