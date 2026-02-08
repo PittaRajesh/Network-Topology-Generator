@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Linux Network Configuration
+# Device: {{ device_name }}
+# Generated: {{ generated_date }}
+
+# Disable and enable networking
+systemctl restart networking
+
+{%- for interface in interfaces %}
+
+# Configure interface {{ interface.interface_name }}
+auto {{ interface.interface_name }}
+iface {{ interface.interface_name }} inet static
+    address {{ interface.ip_address.split('/')[0] }}
+    netmask {{ subnet_mask }}
+{%- if interface.description %}
+    comment {{ interface.description }}
+{%- endif %}
+
+{%- endfor %}
+
+# Sysctl tuning for routing
+sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv4.conf.all.forwarding=1
+
+{%- if bgp_enabled %}
+# FRRouting BGP Configuration (future enhancement)
+# This will be populated when BGP support is added
+{%- endif %}
+
+echo "Network configuration completed for {{ device_name }}"

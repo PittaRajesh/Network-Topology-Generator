@@ -1,0 +1,114 @@
+# Containerlab topology for Networking Automation Engine
+# This topology deploys the engine and its dependencies in containers
+
+name: networking-automation-engine
+topology:
+  nodes:
+    # Main API Service
+    api:
+      kind: linux
+      image: networking-automation-engine:latest
+      binds:
+        - ./templates:/app/templates:ro
+        - ./logs:/app/logs
+      ports:
+        - 8000:8000/tcp
+      env:
+        LOG_LEVEL: INFO
+        DEBUG: "false"
+      exec:
+        - bash -c "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+      labels:
+        service: api
+        tier: frontend
+
+    # PostgreSQL Database
+    database:
+      kind: linux
+      image: postgres:15-alpine
+      env:
+        POSTGRES_DB: networking_automation
+        POSTGRES_USER: automation
+        POSTGRES_PASSWORD: secure_password
+      ports:
+        - 5432:5432/tcp
+      volumes:
+        - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      labels:
+        service: database
+        tier: backend
+
+    # Redis Cache
+    cache:
+      kind: linux
+      image: redis:7-alpine
+      ports:
+        - 6379:6379/tcp
+      exec:
+        - redis-server --appendonly yes
+      labels:
+        service: cache
+        tier: backend
+
+    # Prometheus Metrics
+    prometheus:
+      kind: linux
+      image: prom/prometheus:latest
+      ports:
+        - 9090:9090/tcp
+      binds:
+        - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      exec:
+        - prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
+      labels:
+        service: monitoring
+        tier: management
+
+    # Grafana Dashboard
+    grafana:
+      kind: linux
+      image: grafana/grafana:latest
+      ports:
+        - 3000:3000/tcp
+      env:
+        GF_SECURITY_ADMIN_PASSWORD: admin
+      depends_on:
+        - prometheus
+      labels:
+        service: monitoring
+        tier: management
+
+    # Test Router (simulated)
+    test-router:
+      kind: linux
+      image: frrouting/frr:latest
+      ports:
+        - 8001:8000/tcp
+      labels:
+        service: test
+        tier: testing
+
+  links:
+    # API connects to Database
+    - endpoints: ["api:eth0", "database:eth0"]
+      mtu: 1500
+
+    # API connects to Cache
+    - endpoints: ["api:eth1", "cache:eth0"]
+      mtu: 1500
+
+    # API connects to Prometheus
+    - endpoints: ["api:eth2", "prometheus:eth1"]
+      mtu: 1500
+
+    # Prometheus connects to Grafana
+    - endpoints: ["prometheus:eth0", "grafana:eth0"]
+      mtu: 1500
+
+    # Test Router connection
+    - endpoints: ["api:eth3", "test-router:eth0"]
+      mtu: 1500
+
+  mgmt:
+    ipv4_subnet: 172.20.20.0/24
+    ipv6_subnet: 2001:172:20:20::/64

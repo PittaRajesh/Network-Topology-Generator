@@ -1,0 +1,29 @@
+! Cisco IOS-XE Network Configuration Template
+! Device: {{ device_name }}
+! Generated: {{ generated_date }}
+
+version 15.2
+
+hostname {{ device_name }}
+
+! Enable IPv4 Routing
+ip routing
+
+{%- for interface in interfaces %}
+
+interface {{ interface.interface_name }}
+ description {{ interface.description }}
+ ip address {{ interface.ip_address.split('/')[0] }} {{ subnet_mask }}
+ no shutdown
+{%- endfor %}
+
+! OSPF Configuration
+router ospf {{ ospf_process_id }}
+ router-id {{ router_id }}
+{%- for network in networks %}
+ network {{ network.network }} {{ network.netmask }} area {{ network.area }}
+{%- endfor %}
+
+! Logging
+logging console
+logging buffered 4096

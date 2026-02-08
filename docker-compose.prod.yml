@@ -1,0 +1,137 @@
+# Production Docker Compose with external volume and resource limits
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: networking-automation-api-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=WARNING
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - ./templates:/app/templates:ro
+      - api_logs:/app/logs
+      - ./exports:/app/exports
+    resources:
+      limits:
+        cpus: '2'
+        memory: 1G
+      reservations:
+        cpus: '1'
+        memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: always
+    networks:
+      - networking-automation
+    labels:
+      com.networking-automation.environment: "production"
+
+  database:
+    image: postgres:15-alpine
+    container_name: networking-automation-db-prod
+    environment:
+      POSTGRES_DB: networking_automation
+      POSTGRES_USER: automation
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        cpus: '1'
+        memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U automation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - networking-automation
+    labels:
+      com.networking-automation.environment: "production"
+    ports: []  # Don't expose in production
+
+  cache:
+    image: redis:7-alpine
+    container_name: networking-automation-cache-prod
+    volumes:
+      - redis_prod_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        cpus: '0.5'
+        memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - networking-automation
+    ports: []  # Don't expose in production
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: networking-automation-prometheus-prod
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_prod_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'
+    restart: always
+    networks:
+      - networking-automation
+    ports: []  # Don't expose in production
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: networking-automation-grafana-prod
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    volumes:
+      - grafana_prod_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: always
+    networks:
+      - networking-automation
+
+networks:
+  networking-automation:
+    driver: bridge
+    name: networking-automation-prod-net
+
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  prometheus_prod_data:
+    driver: local
+  grafana_prod_data:
+    driver: local
+  api_logs:
+    driver: local

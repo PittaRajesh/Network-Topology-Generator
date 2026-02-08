@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# OSPF Router Configuration Template
+# Device: {{ device_name }}
+# Generated: {{ generated_date }}
+
+{# ============================================ #}
+{# ROUTER CONFIGURATION #}
+{# ============================================ #}
+
+! Configure router name
+hostname {{ device_name }}
+
+! Configure interfaces
+{%- for interface in interfaces %}
+
+interface {{ interface.interface_name }}
+ description {{ interface.description }}
+ ip address {{ interface.ip_address.split('/')[0] }} {{ subnet_mask }}
+ no shutdown
+{%- endfor %}
+
+! OSPF Configuration
+router ospf {{ ospf_process_id }}
+ router-id {{ router_id }}
+{%- for network in networks %}
+ network {{ network.network }} {{ network.netmask }} area {{ network.area }}
+{%- endfor %}
+
+! Enable logging
+logging console
+logging level debug
